@@ -523,7 +523,7 @@ st.image('https://i.huffpost.com/gen/1529947/images/o-STOCK-MARKET-facebook.jpg'
 
 # Short introduction for any common layman
 st.subheader('This stock tracker app is mainly for NSE stocks')
-st.subheader('Made by Srivathsan Murali and Mark Allen')
+st.subheader('Made by the Computer science club of Arsha Vidya Mandir, Chennai-32, Tamil Nadu, India')
 
 #Important warning for making sure that this app is only made for exhibiting the python knowledge that we are using to make the app
 
