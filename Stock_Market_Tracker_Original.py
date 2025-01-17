@@ -185,6 +185,18 @@ def Priceplt():
     History = Ticker.history(period = tperiod,start = Start,end = End)
     # To change the history dataframe  as per the users wish of time period
 
+
+
+
+
+
+
+
+
+
+
+
+
     #Fig is the first plot figue that we make
     #It is a simple plot based on the closing prices of the stock
     fig = go.Figure(data= go.Scatter(x=History.index,y=History['Close'],mode = 'lines'))
@@ -271,18 +283,31 @@ def Priceplt():
 
 # Volume plot the Fourth function that we define. It can be confused with the already used price plot vaariations but volume as a seperate plot helps traders in other ways
 def Volumeplt():
-
     st.header('**Volume Plot**')
     st.subheader('Parameters:')
 
-    Start = st.date_input("Start date:",dt.date(2022,1,1))
-    End = st.date_input("End date:",dt.date(2022,2,5))
+    Start = st.date_input("Start date:", dt.date(2022, 1, 1))
+    End = st.date_input("End date:", dt.date(2022, 2, 5))
 
-    tperiod = st.selectbox('Time period:',Periods) # The graph is not refined even after reducing the period
+    tperiod = st.selectbox('Time period:', Periods)  # The graph is not refined even after reducing the period
 
-    History = Ticker.history(period = Periods,start = Start,end = End)
-    fig = go.Figure(data= go.Scatter(x=History.index,y=History['Volume'],mode = 'lines+markers')) #Using lines and markers show particulars points ->(markers where the volume takes a sharp or drastic turn while lines are to represent the volumes)
-    st.plotly_chart(fig)
+    History = Ticker.history(period=tperiod, start=Start, end=End)
+
+    if History.empty:
+        st.warning("No data available for the selected stock in the given period.")
+    else:
+        st.write(History)  # Display the raw data to check if 'Volume' is present
+
+        # Convert the 'Volume' column to numeric, coercing errors to NaN
+        History['Volume'] = pd.to_numeric(History['Volume'], errors='coerce')
+
+        if 'Volume' not in History.columns or History['Volume'].isnull().all():
+            st.warning("No volume data available for the selected stock in the given period.")
+        else:
+            # Plot the volume data
+            fig = go.Figure(data=go.Scatter(x=History.index, y=History['Volume'], mode='lines+markers'))
+            st.plotly_chart(fig)
+
 
 
 
@@ -294,35 +319,42 @@ def Major_Holders():
     st.header('**Major Holders**')
 
     Mhol_df = Ticker.major_holders
+    
+    # Display the dataframe to inspect its structure
     st.write(Mhol_df)
+
+    # Print the column names to debug
+    st.write("Columns in major holders data:", Mhol_df.columns)
     
-    csv = convert_df(Mhol_df) #To download the pandas dataframe as csv file
-    st.download_button("Download Major holders as csv file",csv,(Stckinp+"_Major_Holders.csv"),"text/csv",key='download-csv')
+    # Ensure that the dataframe has data
+    if Mhol_df.empty:
+        st.warning("No data available for Major Holders.")
+        return
 
-    Pie_Chart = st.button('Pie Chart of holders')
+    # Try accessing the columns correctly based on the structure
+    try:
+        insiders_percent = Mhol_df.iloc[0, 0]  # Access the first value in the first column (insidersPercentHeld)
+        institutions_percent = Mhol_df.iloc[1, 0]  # Access the second value in the first column (institutionsPercentHeld)
+        float_percent = Mhol_df.iloc[2, 0]  # Access the third value in the first column (institutionsFloatPercentHeld)
 
-    #We create two lists -> labels and values, labels contains the names of the stakeholder types and values contain the percentage of each of the stakeholders
-    labels = []
-    for j in Mhol_df[1]: 
-        labels+=[j]
+        # Define labels and values for the pie chart
+        labels = ['Insiders', 'Institutions', 'Float', 'Others']
+        values = [insiders_percent, institutions_percent, float_percent, 1 - (insiders_percent + institutions_percent + float_percent)]
 
-    values = []
-    for i in Mhol_df[0]:
-        if i[-1] == '%':
-            values+=[i[:-1]]
-    
-    if Pie_Chart == True:
-        fig = go.Figure(go.Pie(labels = labels,values = values))
-        st.write(fig)
+        # Adjust values if the total doesn't sum to 1
+        if sum(values) != 1.0:
+            values[-1] = 1 - sum(values[:-1])
 
-        # We encountered in a difference in the representation of the pie chart and the values in the dataframe. 
-        # Upon further understanding we believe the difference in the pie chart and the dataframe is due to the floating shares 
-        # -> the floating shares are shares that are being traded and is not kept a constant record of since they can't be assessed easily
-        # Only upon a concentration of these shares are they monitored and recognised
+        # Plot the pie chart
+        fig = go.Figure(go.Pie(labels=labels, values=values, title="Major Holders Distribution"))
+        st.plotly_chart(fig)
 
-        st.warning('Please note that the pie chart information may vary from the table due to the presence of floating shares')
-
-
+    except KeyError as e:
+        st.error(f"Error: {e}. This might be due to the column not existing in the data. Please check the column names.")
+        
+    # Add the CSV download functionality
+    csv = convert_df(Mhol_df)
+    st.download_button("Download Major holders as csv file", csv, (Stckinp + "_Major_Holders.csv"), "text/csv", key='download-csv')
 
 
 # Balance sheet is the Sixth function that we define. Balance sheets are the credit and debit of the company all documented into one table. 
@@ -444,17 +476,20 @@ def Sustainability():
 
 def Analyst_Recommendations():
     st.header('Analyst Recommendations')
-    if (Ticker.recommendations) == None:
-        st.info('Please note that there are no Analyst reccomendations for this stock in the Yahoo finance library as now. Sorry for the incovenience')
+    if Ticker.recommendations is None or Ticker.recommendations.empty:
+        st.info('Please note that there are no Analyst recommendations for this stock in the Yahoo finance library at this time.')
     else:
         st.write(Ticker.recommendations)
 
 
 
+
 def Earning_Calendar():
     st.header('Earning Calendar')
-    if len(Ticker.calendar.index) < 1: # The info doesn't pop even though the condition is given
-        st.info('Please note that there are no Earning calendars for this stock in the Yahoo finance library as now. Sorry for the incovenience')
+    
+    # Check if Ticker.calendar is a dictionary and whether it contains any data
+    if isinstance(Ticker.calendar, dict) and len(Ticker.calendar) < 1:
+        st.info('Please note that there are no Earning calendars for this stock in the Yahoo finance library at this time.')
     else:
         st.write(Ticker.calendar)
 
@@ -523,7 +558,7 @@ st.image('https://i.huffpost.com/gen/1529947/images/o-STOCK-MARKET-facebook.jpg'
 
 # Short introduction for any common layman
 st.subheader('This stock tracker app is mainly for NSE stocks')
-st.subheader('Made by the Computer science club of Arsha Vidya Mandir, Chennai-32, Tamil Nadu, India')
+st.subheader('Made by Srivathsan Murali and Mark')
 
 #Important warning for making sure that this app is only made for exhibiting the python knowledge that we are using to make the app
 
